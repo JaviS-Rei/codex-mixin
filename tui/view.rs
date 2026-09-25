@@ -1005,11 +1005,12 @@ pub(super) fn render_integrations(frame: &mut ratatui::Frame<'_>, area: Rect, ap
     let cards = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
+            Constraint::Ratio(1, 6),
+            Constraint::Ratio(1, 6),
+            Constraint::Ratio(1, 6),
+            Constraint::Ratio(1, 6),
+            Constraint::Ratio(1, 6),
+            Constraint::Ratio(1, 6),
         ])
         .split(area);
     frame.render_widget(
@@ -1083,13 +1084,35 @@ pub(super) fn render_integrations(frame: &mut ratatui::Frame<'_>, area: Rect, ap
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(Span::styled(
+                "GROK BUILD",
+                Style::default().fg(Color::Blue).bold(),
+            )),
+            Line::from(vec![
+                action_label(7, "[g] Install / refresh", app.integration_index),
+                Span::raw("       "),
+                action_label(8, "[G] Remove", app.integration_index),
+            ]),
+        ])
+        .block(
+            Block::default()
+                .title(" GROK BUILD ")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Blue)),
+        )
+        .wrap(Wrap { trim: true }),
+        cards[3],
+    );
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::from(Span::styled(
                 "OPENCODE",
                 Style::default().fg(Color::Cyan).bold(),
             )),
             Line::from(vec![
-                action_label(7, "[8] Install / refresh", app.integration_index),
+                action_label(9, "[8] Install / refresh", app.integration_index),
                 Span::raw("       "),
-                action_label(8, "[9] Remove", app.integration_index),
+                action_label(10, "[9] Remove", app.integration_index),
             ]),
         ])
         .block(
@@ -1100,7 +1123,7 @@ pub(super) fn render_integrations(frame: &mut ratatui::Frame<'_>, area: Rect, ap
                 .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: true }),
-        cards[3],
+        cards[4],
     );
     frame.render_widget(
         Paragraph::new(vec![
@@ -1109,9 +1132,9 @@ pub(super) fn render_integrations(frame: &mut ratatui::Frame<'_>, area: Rect, ap
                 Style::default().fg(Color::Yellow).bold(),
             )),
             Line::from(vec![
-                action_label(9, "[p] Install / refresh", app.integration_index),
+                action_label(11, "[p] Install / refresh", app.integration_index),
                 Span::raw("       "),
-                action_label(10, "[P] Remove", app.integration_index),
+                action_label(12, "[P] Remove", app.integration_index),
             ]),
         ])
         .block(
@@ -1122,7 +1145,7 @@ pub(super) fn render_integrations(frame: &mut ratatui::Frame<'_>, area: Rect, ap
                 .border_style(Style::default().fg(Color::Yellow)),
         )
         .wrap(Wrap { trim: true }),
-        cards[4],
+        cards[5],
     );
 }
 
@@ -1676,7 +1699,7 @@ pub(super) fn render_footer(frame: &mut ratatui::Frame<'_>, area: Rect, app: &Ap
             }
             Page::Fusion => "Up/Down model  Space Panel  j Judge  f Final  s save  D disable",
             Page::Integrations => {
-                "1-3 Codex  4-5 Claude  6-7 DSH  8-9 OpenCode  p/P Pi  click or press a key"
+                "1-3 Codex  4-5 Claude  6-7 DSH  g/G Grok Build  8-9 OpenCode  p/P Pi"
             }
             Page::System => "s/R gateway  u update  d doctor  F repair  f catalog  l logs",
             Page::Diagnostics => "x doctor  PgUp/PgDn scroll  r refresh  ? help  q quit",

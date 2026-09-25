@@ -26,6 +26,8 @@ fn user_facing_command_groups_parse() {
     assert!(Cli::try_parse_from(["codex-mixin", "connect", "codex", "--custom-only"]).is_ok());
     assert!(Cli::try_parse_from(["codex-mixin", "connect", "claude"]).is_ok());
     assert!(Cli::try_parse_from(["codex-mixin", "connect", "dsh"]).is_ok());
+    assert!(Cli::try_parse_from(["codex-mixin", "connect", "grok-build"]).is_ok());
+    assert!(Cli::try_parse_from(["codex-mixin", "connect", "remove", "grok-build"]).is_ok());
     assert!(
         Cli::try_parse_from(["codex-mixin", "config", "export", "/tmp/mixin-backup.b64"]).is_ok()
     );

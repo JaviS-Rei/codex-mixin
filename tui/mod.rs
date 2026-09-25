@@ -384,6 +384,7 @@ enum ConfirmOperation {
     UninstallCodex,
     UninstallClaude,
     UninstallDsh,
+    UninstallGrokBuild,
     UninstallOpenCode,
     UninstallPi,
     Update,
@@ -396,6 +397,7 @@ impl ConfirmOperation {
             Self::UninstallCodex => "Restore Codex",
             Self::UninstallClaude => "Restore Claude Code",
             Self::UninstallDsh => "Remove DSH integration",
+            Self::UninstallGrokBuild => "Remove Grok Build integration",
             Self::UninstallOpenCode => "Remove OpenCode integration",
             Self::UninstallPi => "Remove Pi integration",
             Self::Update => "Update Codex Mixin",
@@ -408,6 +410,9 @@ impl ConfirmOperation {
             Self::UninstallCodex => "Restore the Codex configuration saved before installation.",
             Self::UninstallClaude => "Remove managed Claude Code settings and restore the backup.",
             Self::UninstallDsh => "Remove codex-mixin from DSH settings and credentials.",
+            Self::UninstallGrokBuild => {
+                "Remove the managed provider, models, and gateway credential from Grok Build."
+            }
             Self::UninstallOpenCode => {
                 "Remove the managed provider and gateway credential from OpenCode."
             }
@@ -587,11 +592,13 @@ enum Action {
     ConnectCodexCustom,
     ConnectClaude,
     ConnectDsh,
+    ConnectGrokBuild,
     ConnectOpenCode,
     ConnectPi,
     ConfirmUninstallCodex,
     ConfirmUninstallClaude,
     ConfirmUninstallDsh,
+    ConfirmUninstallGrokBuild,
     ConfirmUninstallOpenCode,
     ConfirmUninstallPi,
     ConfirmUpdate,
@@ -1078,6 +1085,16 @@ pub(crate) async fn run(
                 )
                 .await;
             }
+            Action::ConnectGrokBuild => {
+                run_action(
+                    &mut terminal,
+                    &mut app,
+                    "Installing Grok Build connection",
+                    &["connect", "grok-build"],
+                    true,
+                )
+                .await;
+            }
             Action::ConnectOpenCode => {
                 run_action(
                     &mut terminal,
@@ -1106,6 +1123,11 @@ pub(crate) async fn run(
             }
             Action::ConfirmUninstallDsh => {
                 app.dialog = Some(Dialog::ConfirmOperation(ConfirmOperation::UninstallDsh));
+            }
+            Action::ConfirmUninstallGrokBuild => {
+                app.dialog = Some(Dialog::ConfirmOperation(
+                    ConfirmOperation::UninstallGrokBuild,
+                ));
             }
             Action::ConfirmUninstallOpenCode => {
                 app.dialog = Some(Dialog::ConfirmOperation(
@@ -1140,6 +1162,11 @@ pub(crate) async fn run(
                     ConfirmOperation::UninstallDsh => (
                         "Removing DSH integration",
                         &["connect", "remove", "dsh"][..],
+                        true,
+                    ),
+                    ConfirmOperation::UninstallGrokBuild => (
+                        "Removing Grok Build integration",
+                        &["connect", "remove", "grok-build"][..],
                         true,
                     ),
                     ConfirmOperation::UninstallOpenCode => (

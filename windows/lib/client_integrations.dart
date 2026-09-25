@@ -38,6 +38,13 @@ const clientIntegrations = <ClientIntegration>[
     removeArguments: ['connect', 'remove', 'dsh'],
   ),
   ClientIntegration(
+    id: 'grok-build',
+    displayName: 'Grok Build',
+    removeVerb: '卸载',
+    installArguments: ['connect', 'grok-build'],
+    removeArguments: ['connect', 'remove', 'grok-build'],
+  ),
+  ClientIntegration(
     id: 'opencode',
     displayName: 'OpenCode',
     removeVerb: '卸载',

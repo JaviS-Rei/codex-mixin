@@ -7,5 +7,6 @@ pub mod claude;
 pub mod codex;
 pub mod dsh;
 pub mod files;
+pub mod grok_build;
 pub mod opencode;
 pub mod pi;

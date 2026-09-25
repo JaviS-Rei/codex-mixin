@@ -25,6 +25,13 @@ pub(super) async fn responses(
         return forward_official_responses(&state, &headers, body).await;
     }
     let stream = stream_custom_responses(&state, &headers, body, route).await?;
+    let stream = if state.config.gateway_client_keys.authenticate(&headers)
+        == Some(crate::gateway_access::GatewayClient::GrokBuild)
+    {
+        crate::protocol::sse::normalize_responses_sequence(stream)
+    } else {
+        stream
+    };
     sse_response(stream)
 }
 

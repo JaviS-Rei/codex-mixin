@@ -91,6 +91,13 @@ InstallTarget installTargetFor(String id) {
         supported: false,
         buildArgs: (_) => const <String>[],
       );
+    case 'grok-build':
+      return InstallTarget(
+        id: id,
+        name: 'Grok Build',
+        supported: false,
+        buildArgs: (_) => const <String>[],
+      );
     case 'opencode':
       return InstallTarget(
         id: id,

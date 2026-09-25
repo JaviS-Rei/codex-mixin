@@ -548,8 +548,18 @@ fn mouse_selects_tabs_and_integration_actions() {
         handle_mouse_event(&mut app, MouseEventKind::Down(MouseButton::Left), 90, 8),
         Action::ConfirmUninstallCodex
     );
-    assert_eq!(integration_action(9), Action::ConnectPi);
-    assert_eq!(integration_action(10), Action::ConfirmUninstallPi);
+    assert_eq!(integration_action(7), Action::ConnectGrokBuild);
+    assert_eq!(integration_action(8), Action::ConfirmUninstallGrokBuild);
+    assert_eq!(integration_action(11), Action::ConnectPi);
+    assert_eq!(integration_action(12), Action::ConfirmUninstallPi);
+    assert_eq!(
+        handle_mouse_event(&mut app, MouseEventKind::Down(MouseButton::Left), 10, 18),
+        Action::ConnectGrokBuild
+    );
+    assert_eq!(
+        handle_mouse_event(&mut app, MouseEventKind::Down(MouseButton::Left), 90, 26),
+        Action::ConfirmUninstallPi
+    );
 }
 
 #[test]

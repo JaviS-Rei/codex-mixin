@@ -241,14 +241,17 @@ pub(super) fn handle_mouse_event(
         }
         Page::Integrations => {
             let relative_row = row.saturating_sub(body.y);
-            let card = (usize::from(relative_row) * 5 / usize::from(body.height.max(1))).min(4);
+            let card = (usize::from(relative_row) * 6 / usize::from(body.height.max(1))).min(5);
             let relative_column = column.saturating_sub(body.x);
             app.integration_index = match card {
                 0 => (usize::from(relative_column) * 3 / usize::from(body.width.max(1))).min(2),
                 1 => 3 + (usize::from(relative_column) * 2 / usize::from(body.width.max(1))).min(1),
                 2 => 5 + (usize::from(relative_column) * 2 / usize::from(body.width.max(1))).min(1),
                 3 => 7 + (usize::from(relative_column) * 2 / usize::from(body.width.max(1))).min(1),
-                _ => 9 + (usize::from(relative_column) * 2 / usize::from(body.width.max(1))).min(1),
+                4 => 9 + (usize::from(relative_column) * 2 / usize::from(body.width.max(1))).min(1),
+                _ => {
+                    11 + (usize::from(relative_column) * 2 / usize::from(body.width.max(1))).min(1)
+                }
             };
             integration_action(app.integration_index)
         }
@@ -399,9 +402,11 @@ pub(super) fn integration_action(index: usize) -> Action {
         4 => Action::ConfirmUninstallClaude,
         5 => Action::ConnectDsh,
         6 => Action::ConfirmUninstallDsh,
-        7 => Action::ConnectOpenCode,
-        8 => Action::ConfirmUninstallOpenCode,
-        9 => Action::ConnectPi,
+        7 => Action::ConnectGrokBuild,
+        8 => Action::ConfirmUninstallGrokBuild,
+        9 => Action::ConnectOpenCode,
+        10 => Action::ConfirmUninstallOpenCode,
+        11 => Action::ConnectPi,
         _ => Action::ConfirmUninstallPi,
     }
 }
@@ -440,7 +445,7 @@ pub(super) fn handle_page_event(app: &mut App, code: KeyCode) -> Action {
                 Action::None
             }
             KeyCode::Right | KeyCode::Down => {
-                app.integration_index = (app.integration_index + 1).min(10);
+                app.integration_index = (app.integration_index + 1).min(12);
                 Action::None
             }
             KeyCode::Enter => integration_action(app.integration_index),
@@ -451,6 +456,8 @@ pub(super) fn handle_page_event(app: &mut App, code: KeyCode) -> Action {
             KeyCode::Char('5') => Action::ConfirmUninstallClaude,
             KeyCode::Char('6') => Action::ConnectDsh,
             KeyCode::Char('7') => Action::ConfirmUninstallDsh,
+            KeyCode::Char('g') => Action::ConnectGrokBuild,
+            KeyCode::Char('G') => Action::ConfirmUninstallGrokBuild,
             KeyCode::Char('8') => Action::ConnectOpenCode,
             KeyCode::Char('9') => Action::ConfirmUninstallOpenCode,
             KeyCode::Char('p') => Action::ConnectPi,

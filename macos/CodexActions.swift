@@ -273,6 +273,83 @@ extension AppDelegate {
         }
     }
 
+    @objc func installGrokBuild() {
+        Task { @MainActor in
+            serviceBusy = true
+            serviceStatus = "正在准备 Grok Build 配置..."
+            defer { serviceBusy = false }
+            do {
+                try await runOperationProgress(
+                    title: "正在安装到 Grok Build",
+                    phases: [
+                        "准备网关",
+                        "写入 Grok Build provider",
+                        "写入模型与网关认证",
+                        "完成",
+                    ],
+                    successTitle: "✓ 安装完成",
+                    failureTitle: "✗ 安装失败",
+                    showFailureAlert: true,
+                    failureAlertTitle: "安装到 Grok Build 失败"
+                ) { progress in
+                    progress.advance(to: 0)
+                    let status = try await ensureGatewayReady()
+                    applyGatewayStatus(status)
+                    progress.advance(to: 1)
+                    _ = try await runGateway(["connect", "grok-build"])
+                    progress.advance(to: 2)
+                    progress.advance(to: 3)
+                    showAlert(
+                        title: "Grok Build 配置已更新",
+                        message: "已把本地网关注册为 Grok Build 的 codex-mixin-managed provider，并加入当前已选模型与思考强度。请重启 Grok Build 或开启新会话，然后用 /model 选择模型。"
+                    )
+                    await refreshStatusNow()
+                }
+            } catch {
+                serviceStatus = "安装 Grok Build 配置失败"
+            }
+        }
+    }
+
+    @objc func uninstallGrokBuild() {
+        guard confirm(
+            title: "从 Grok Build 卸载",
+            message: "会从 Grok Build 全局配置删除 Codex Mixin 管理的 provider、模型和本地网关凭据，其他 Grok Build 配置会保留。完成后需要重启 Grok Build。"
+        ) else { return }
+        Task { @MainActor in
+            serviceBusy = true
+            defer { serviceBusy = false }
+            do {
+                try await runOperationProgress(
+                    title: "正在从 Grok Build 卸载",
+                    phases: [
+                        "读取 Grok Build 配置",
+                        "移除 codex-mixin-managed provider 和模型",
+                        "清理本地网关凭据",
+                        "完成",
+                    ],
+                    successTitle: "✓ 卸载完成",
+                    failureTitle: "✗ 卸载失败",
+                    showFailureAlert: true,
+                    failureAlertTitle: "从 Grok Build 卸载失败"
+                ) { progress in
+                    progress.advance(to: 0)
+                    progress.advance(to: 1)
+                    let output = try await runGateway(["connect", "remove", "grok-build"])
+                    progress.advance(to: 2)
+                    progress.advance(to: 3)
+                    let message = output.isEmpty
+                        ? "已从 Grok Build 移除 codex-mixin-managed provider 和模型。请重启 Grok Build。"
+                        : "\(output)\n\n请重启 Grok Build。"
+                    showAlert(title: "Grok Build 配置已恢复", message: message)
+                    refreshStatus()
+                }
+            } catch {
+                // Failure already shown by the progress window + alert.
+            }
+        }
+    }
+
     @objc func uninstallOpenCode() {
         guard confirm(
             title: "从 OpenCode 卸载",

@@ -79,7 +79,8 @@ Codex Mixin 不是 Codex 的二次发行版，也不重新打包官方 Codex App
 - Fusion 支持多模型 `Panel → Judge → Final` 编排和按时间轮转，并生成 Codex 原生 Review。
 - 本地网关只监听 loopback，默认由操作系统动态分配端口，并把实际端点同步给已连接客户端。
 - 配置以加密形式落盘，可导出为 Base64 备份并在另一台机器一键导入。
-- Codex、Claude Code、DSH、OpenCode 和 Pi 的集成均可安装、同步和恢复。
+- Codex、Claude Code、DSH、Grok Build、OpenCode 和 Pi 的集成均可安装、同步和恢复。
+  Grok Build 接入会在 `~/.grok/config.toml` 注册 Codex Mixin 的 `codex-mixin-managed` Responses provider 和已选模型；CLI 使用 `codex-mixin connect grok-build` 安装，使用 `codex-mixin connect remove grok-build` 恢复。
 
 ### 产品形态
 
@@ -131,7 +132,8 @@ Highlights include:
 - Multi-model and time-rotation Fusion workflows with native Codex Review output.
 - Loopback-only gateway endpoints with OS-assigned ports and automatic client synchronization.
 - Encrypted local storage and portable Base64 configuration backups.
-- Reversible integrations for Codex, Claude Code, DSH, OpenCode, and Pi.
+- Reversible integrations for Codex, Claude Code, DSH, Grok Build, OpenCode, and Pi.
+  Grok Build receives the `codex-mixin-managed` Responses provider and selected models in `~/.grok/config.toml`; use `codex-mixin connect grok-build` to install and `codex-mixin connect remove grok-build` to restore it.
 
 See the [Product Tour](https://github.com/Edward-lyz/codex-mixin/wiki/Product-Tour) for the complete macOS, TUI, Fusion, and mobile gallery. The [GitHub Wiki](https://github.com/Edward-lyz/codex-mixin/wiki) contains installation, tutorials, CLI reference, backup and restore, security, troubleshooting, and FAQs.
 

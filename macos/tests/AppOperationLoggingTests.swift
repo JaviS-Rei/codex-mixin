@@ -65,6 +65,13 @@ struct AppOperationLoggingTests {
         precondition(installSummary.contains("missing 0"))
         precondition(!installSummary.contains("future-secret"))
 
+        let grokBuildSummary = diagnosticOutputSummary(
+            arguments: ["connect", "grok-build"],
+            output: "Grok Build provider: codex-mixin-managed\nmodels installed: 2"
+        )
+        precondition(grokBuildSummary.contains("Grok Build provider"))
+        precondition(grokBuildSummary.contains("models installed: 2"))
+
         let quotaSummary = diagnosticOutputSummary(
             arguments: ["quota", "--json"],
             output: #"{"raw":{"private_account_field":"secret"},"used":1}"#

@@ -25,6 +25,7 @@ mod ducx_setup;
 #[path = "ducx_setup_windows.rs"]
 mod ducx_setup;
 mod fusion_config;
+mod grok_build;
 mod maintenance;
 mod metadata;
 mod official_models;
@@ -51,6 +52,10 @@ use doctor::doctor;
 use dsh::{install_dsh, sync_installed_dsh_client_key, sync_installed_dsh_models, uninstall_dsh};
 use ducx_setup::ensure_managed_ducx;
 use fusion_config::{delete_fusion_profile, get_fusion_profile, set_fusion_profile};
+use grok_build::{
+    install_grok_build, sync_installed_grok_build_client_key, sync_installed_grok_build_models,
+    uninstall_grok_build,
+};
 use maintenance::migrate_history;
 use metadata::{load_model_metadata_resolver, refresh_metadata};
 use opencode::{
@@ -97,6 +102,7 @@ pub(in crate::cli) fn sync_installed_client_keys() -> anyhow::Result<()> {
     sync_installed_codex_client_key(None)?;
     sync_installed_claude_client_key()?;
     sync_installed_dsh_client_key()?;
+    sync_installed_grok_build_client_key()?;
     sync_installed_opencode_client_key()?;
     sync_installed_pi_client_key()?;
     Ok(())
@@ -109,6 +115,9 @@ pub(in crate::cli) fn sync_installed_client_models() -> anyhow::Result<Vec<&'sta
     }
     if sync_installed_dsh_models()? {
         refreshed.push("DSH");
+    }
+    if sync_installed_grok_build_models()? {
+        refreshed.push("Grok Build");
     }
     if sync_installed_opencode_models()? {
         refreshed.push("OpenCode");
@@ -536,6 +545,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 report_hook::sync_installation_at(&hooks_path, report_hook::reporting_enabled()?)?;
                 report_hook::sync_installation()
             }
+            ConnectCommand::GrokBuild { config_path } => install_grok_build(config_path),
             ConnectCommand::Opencode { config_path } => install_opencode(config_path),
             ConnectCommand::Pi { agent_dir } => install_pi(agent_dir),
             ConnectCommand::Status { settings_path } => claude_status(settings_path),
@@ -543,6 +553,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 target,
                 settings_path,
                 dsh_home,
+                grok_build_config,
                 opencode_config,
                 pi_agent_dir,
             } => match target.as_str() {
@@ -575,6 +586,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         report_hook::reporting_enabled()?,
                     )?;
                     report_hook::sync_installation()
+                }
+                "grok-build" | "grok" => {
+                    uninstall_grok_build(grok_build_config)?;
+                    codex_mixin::config::revoke_gateway_client_key(
+                        codex_mixin::gateway_access::GatewayClient::GrokBuild,
+                    )
                 }
                 "opencode" => {
                     uninstall_opencode(opencode_config)?;

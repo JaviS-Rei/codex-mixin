@@ -32,9 +32,15 @@ void main() {
       'codex',
       'claude',
       'dsh',
+      'grok-build',
       'opencode',
       'pi',
     ]);
+    final grokBuild = clientIntegrations.firstWhere(
+      (client) => client.id == 'grok-build',
+    );
+    expect(grokBuild.installArguments, ['connect', 'grok-build']);
+    expect(grokBuild.removeArguments, ['connect', 'remove', 'grok-build']);
     expect(clientIntegrations.last.installArguments, ['connect', 'pi']);
     expect(clientIntegrations.last.removeArguments, [
       'connect',

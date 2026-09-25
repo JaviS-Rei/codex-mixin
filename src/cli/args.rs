@@ -13,7 +13,7 @@ use super::codex::InstallCodexOptions;
 #[command(
     author,
     version,
-    about = "Connect custom model providers to Codex, Claude, DSH, OpenCode, and Pi"
+    about = "Connect custom model providers to Codex, Claude, DSH, Grok Build, OpenCode, and Pi"
 )]
 pub(super) struct Cli {
     /// Keep the plain CLI interface instead of opening the full-screen UI.
@@ -335,6 +335,12 @@ pub(super) enum ConnectCommand {
         #[arg(long)]
         dsh_home: Option<PathBuf>,
     },
+    /// Install the Codex Mixin gateway as a Grok Build model provider.
+    #[command(name = "grok-build", visible_alias = "grok")]
+    GrokBuild {
+        #[arg(long = "config")]
+        config_path: Option<PathBuf>,
+    },
     /// Install the Codex Mixin gateway as an OpenCode provider.
     Opencode {
         #[arg(long = "config")]
@@ -350,14 +356,16 @@ pub(super) enum ConnectCommand {
         #[arg(long)]
         settings_path: Option<PathBuf>,
     },
-    /// Remove Codex, Claude, DSH, OpenCode, or Pi integration.
+    /// Remove Codex, Claude, DSH, Grok Build, OpenCode, or Pi integration.
     Remove {
-        #[arg(value_parser = ["codex", "claude", "dsh", "opencode", "pi"])]
+        #[arg(value_parser = ["codex", "claude", "dsh", "grok-build", "grok", "opencode", "pi"])]
         target: String,
         #[arg(long)]
         settings_path: Option<PathBuf>,
         #[arg(long)]
         dsh_home: Option<PathBuf>,
+        #[arg(long = "grok-build-config")]
+        grok_build_config: Option<PathBuf>,
         #[arg(long = "opencode-config")]
         opencode_config: Option<PathBuf>,
         #[arg(long = "pi-agent-dir")]

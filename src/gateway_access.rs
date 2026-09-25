@@ -11,6 +11,7 @@ pub enum GatewayClient {
     Codex,
     Claude,
     Dsh,
+    GrokBuild,
     OpenCode,
     Pi,
 }
@@ -21,6 +22,7 @@ impl GatewayClient {
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::Dsh => "dsh",
+            Self::GrokBuild => "grok-build",
             Self::OpenCode => "opencode",
             Self::Pi => "pi",
         }
@@ -31,6 +33,7 @@ impl GatewayClient {
             Self::Codex => "Codex",
             Self::Claude => "Claude",
             Self::Dsh => "DSH",
+            Self::GrokBuild => "Grok Build",
             Self::OpenCode => "OpenCode",
             Self::Pi => "Pi",
         }
@@ -46,10 +49,20 @@ pub struct GatewayClientKeys {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dsh: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grok_build: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opencode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pi: Option<String>,
 }
+
+const BEARER_CLIENTS: &[GatewayClient] = &[
+    GatewayClient::Claude,
+    GatewayClient::Dsh,
+    GatewayClient::GrokBuild,
+    GatewayClient::OpenCode,
+    GatewayClient::Pi,
+];
 
 impl GatewayClientKeys {
     pub fn get(&self, client: GatewayClient) -> Option<&str> {
@@ -57,6 +70,7 @@ impl GatewayClientKeys {
             GatewayClient::Codex => self.codex.as_deref(),
             GatewayClient::Claude => self.claude.as_deref(),
             GatewayClient::Dsh => self.dsh.as_deref(),
+            GatewayClient::GrokBuild => self.grok_build.as_deref(),
             GatewayClient::OpenCode => self.opencode.as_deref(),
             GatewayClient::Pi => self.pi.as_deref(),
         }
@@ -67,6 +81,7 @@ impl GatewayClientKeys {
             GatewayClient::Codex => &mut self.codex,
             GatewayClient::Claude => &mut self.claude,
             GatewayClient::Dsh => &mut self.dsh,
+            GatewayClient::GrokBuild => &mut self.grok_build,
             GatewayClient::OpenCode => &mut self.opencode,
             GatewayClient::Pi => &mut self.pi,
         }
@@ -83,14 +98,10 @@ impl GatewayClientKeys {
             .get(header::AUTHORIZATION)
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.strip_prefix("Bearer "));
-        [
-            GatewayClient::Claude,
-            GatewayClient::Dsh,
-            GatewayClient::OpenCode,
-            GatewayClient::Pi,
-        ]
-        .into_iter()
-        .find(|client| self.matches(*client, bearer))
+        BEARER_CLIENTS
+            .iter()
+            .copied()
+            .find(|client| self.matches(*client, bearer))
     }
 
     fn matches(&self, client: GatewayClient, actual: Option<&str>) -> bool {
@@ -138,6 +149,16 @@ mod tests {
         };
         headers.insert(header::AUTHORIZATION, "Bearer pi-key".parse().unwrap());
         assert_eq!(keys.authenticate(&headers), Some(GatewayClient::Pi));
+
+        let keys = GatewayClientKeys {
+            grok_build: Some("grok-build-key".to_owned()),
+            ..Default::default()
+        };
+        headers.insert(
+            header::AUTHORIZATION,
+            "Bearer grok-build-key".parse().unwrap(),
+        );
+        assert_eq!(keys.authenticate(&headers), Some(GatewayClient::GrokBuild));
     }
 
     #[test]

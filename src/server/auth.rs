@@ -25,6 +25,7 @@ pub(super) async fn check_gateway_auth(
             Some(
                 crate::gateway_access::GatewayClient::Claude
                     | crate::gateway_access::GatewayClient::Dsh
+                    | crate::gateway_access::GatewayClient::GrokBuild
                     | crate::gateway_access::GatewayClient::OpenCode
                     | crate::gateway_access::GatewayClient::Pi
             )

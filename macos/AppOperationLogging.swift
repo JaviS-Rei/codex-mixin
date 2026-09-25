@@ -169,7 +169,10 @@ private func shouldIncludeDiagnosticOutput(_ arguments: [String]) -> Bool {
     }
     if command == "connect", arguments.count > 1 {
         return arguments[1] == "dsh"
-            || (arguments[1] == "remove" && arguments.count > 2 && arguments[2] == "dsh")
+            || arguments[1] == "grok-build"
+            || (arguments[1] == "remove"
+                && arguments.count > 2
+                && (arguments[2] == "dsh" || arguments[2] == "grok-build"))
     }
     if command == "providers", arguments.count > 1 {
         return arguments[1] != "list"

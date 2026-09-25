@@ -71,6 +71,60 @@ pub fn encode_raw_event(event: &str, data: &str) -> Bytes {
     Bytes::from(encoded)
 }
 
+/// Grok Build's Responses client deserializes every standard stream event into
+/// the current OpenAI event types, where `sequence_number` is required. Older
+/// compatible upstreams and Codex Mixin's protocol converters may omit it, so
+/// normalize each JSON event at the client boundary while preserving all other
+/// fields and non-JSON payloads byte-for-byte.
+pub fn encode_responses_event_with_sequence(
+    event: &str,
+    data: &str,
+    sequence_number: &mut u64,
+) -> Bytes {
+    if data == "[DONE]" {
+        return encode_raw_event(event, data);
+    }
+    let Ok(mut payload) = serde_json::from_str::<Value>(data) else {
+        return encode_raw_event(event, data);
+    };
+    let Some(object) = payload.as_object_mut() else {
+        return encode_raw_event(event, data);
+    };
+    object.insert("sequence_number".to_owned(), json!(*sequence_number));
+    *sequence_number = sequence_number.saturating_add(1);
+    encode_event(event, &payload).expect("responses event with sequence is serializable")
+}
+
+pub fn normalize_responses_sequence(
+    stream: crate::protocol::ResponseStream,
+) -> crate::protocol::ResponseStream {
+    use futures_util::StreamExt;
+
+    async_stream::stream! {
+        let mut decoder = SseDecoder::default();
+        let mut sequence_number = 0;
+        tokio::pin!(stream);
+        while let Some(chunk) = stream.next().await {
+            let bytes = match chunk {
+                Ok(bytes) => bytes,
+                Err(never) => match never {},
+            };
+            for event in decoder.push(&bytes) {
+                let event_name = event.event.as_deref().unwrap_or("message");
+                yield Ok::<Bytes, std::convert::Infallible>(encode_responses_event_with_sequence(
+                    event_name,
+                    &event.data,
+                    &mut sequence_number,
+                ));
+            }
+        }
+        if !decoder.remaining().is_empty() {
+            yield Ok(Bytes::copy_from_slice(decoder.remaining()));
+        }
+    }
+    .boxed()
+}
+
 pub(crate) fn event_contains_response_metadata(event: &str) -> bool {
     matches!(
         event,
@@ -240,5 +294,58 @@ mod tests {
         assert_eq!(payload["response"]["model"], "model-test");
         assert_eq!(payload["response"]["error"]["message"], "failed");
         assert_eq!(payload["error"]["type"], "server_error");
+    }
+
+    #[test]
+    fn adds_contiguous_sequence_numbers_to_responses_events() {
+        let mut sequence_number = 0;
+        let first = encode_responses_event_with_sequence(
+            "response.created",
+            r#"{"type":"response.created","response":{"id":"r1"}}"#,
+            &mut sequence_number,
+        );
+        let second = encode_responses_event_with_sequence(
+            "response.output_text.delta",
+            r#"{"type":"response.output_text.delta","sequence_number":99,"delta":"hi"}"#,
+            &mut sequence_number,
+        );
+        let parse = |bytes: &Bytes| {
+            let mut decoder = SseDecoder::default();
+            serde_json::from_str::<Value>(&decoder.push(bytes).remove(0).data).unwrap()
+        };
+        assert_eq!(parse(&first)["sequence_number"], 0);
+        assert_eq!(parse(&second)["sequence_number"], 1);
+        assert_eq!(sequence_number, 2);
+    }
+
+    #[tokio::test]
+    async fn normalizes_a_complete_responses_stream() {
+        use futures_util::{StreamExt, stream};
+
+        let input = Bytes::from_static(
+            b"event: response.created\ndata: {\"type\":\"response.created\",\"response\":{}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{}}\n\n",
+        );
+        let source: crate::protocol::ResponseStream =
+            stream::once(async move { Ok(input) }).boxed();
+        let output = normalize_responses_sequence(source)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .fold(Vec::new(), |mut all, bytes| {
+                all.extend_from_slice(&bytes);
+                all
+            });
+        let mut decoder = SseDecoder::default();
+        let sequences = decoder
+            .push(&output)
+            .into_iter()
+            .map(|event| {
+                serde_json::from_str::<Value>(&event.data).unwrap()["sequence_number"]
+                    .as_u64()
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(sequences, vec![0, 1, 2]);
     }
 }
