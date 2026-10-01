@@ -902,6 +902,21 @@ fn record_baidu_protocol_request(
         "anthropic_version": headers
             .get("anthropic-version")
             .and_then(|value| value.to_str().ok()),
+        "grok_client_version": headers
+            .get("x-grok-client-version")
+            .and_then(|value| value.to_str().ok()),
+        "grok_client_identifier": headers
+            .get("x-grok-client-identifier")
+            .and_then(|value| value.to_str().ok()),
+        "grok_client_mode": headers
+            .get("x-grok-client-mode")
+            .and_then(|value| value.to_str().ok()),
+        "grok_client_surface": headers
+            .get("x-grok-client-surface")
+            .and_then(|value| value.to_str().ok()),
+        "user_agent": headers
+            .get(header::USER_AGENT)
+            .and_then(|value| value.to_str().ok()),
         "body": body,
     }));
 }
@@ -3683,6 +3698,47 @@ async fn routes_baidu_models_with_per_model_reasoning_capabilities() {
         .unwrap();
     assert_eq!(deepseek_request["body"]["thinking"]["type"], "adaptive");
     assert_eq!(deepseek_request["body"]["output_config"]["effort"], "max");
+}
+
+#[tokio::test]
+async fn forwards_grok_client_identity_to_responses_provider() {
+    let (upstream_url, requests) = spawn_baidu_protocol_upstream().await;
+    let mut config = test_config(upstream_url);
+    configure_baidu_policy(&mut config);
+    configure_custom_headers_from_env(&mut config);
+    config.providers[0].model_source = ProviderModelSource::BaiduOneApi;
+    configure_model_protocol(
+        &mut config,
+        "gpt-5.6-sol",
+        ProviderProtocol::OpenAiResponses,
+        "/v1/responses",
+    );
+    config.gateway_client_keys.grok_build = Some("grok-build-key".to_owned());
+    let gateway_url = spawn_gateway_with_config(config).await;
+    let mut request = responses_request();
+    request["model"] = json!("gpt-5.6-sol-custom");
+
+    let response = reqwest::Client::new()
+        .post(format!("{gateway_url}/v1/responses"))
+        .bearer_auth("grok-build-key")
+        .header("x-grok-client-version", "1.0.46")
+        .header("x-grok-client-identifier", "grok-shell")
+        .header("x-grok-client-mode", "cli")
+        .header("x-grok-client-surface", "grok-build")
+        .header(header::USER_AGENT, "xai-grok-build/1.0.46")
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let captured = requests.lock().unwrap();
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0]["grok_client_version"], "1.0.46");
+    assert_eq!(captured[0]["grok_client_identifier"], "grok-shell");
+    assert_eq!(captured[0]["grok_client_mode"], "cli");
+    assert_eq!(captured[0]["grok_client_surface"], "grok-build");
+    assert_eq!(captured[0]["user_agent"], "xai-grok-build/1.0.46");
 }
 
 #[tokio::test]

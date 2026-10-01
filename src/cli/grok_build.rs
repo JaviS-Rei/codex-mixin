@@ -20,6 +20,7 @@ pub(in crate::cli) fn install_grok_build(config_path: Option<PathBuf>) -> anyhow
         let config_path = resolve_grok_build_config_path(config_path)?;
         let key_path = grok_build_key_path()?;
         let bind = effective_gateway_bind(&gateway_config)?;
+        let grok_client_version = resolve_grok_build_version()?;
         anyhow::ensure!(
             bind.ip().is_loopback(),
             "Grok Build integration requires a loopback gateway"
@@ -30,6 +31,7 @@ pub(in crate::cli) fn install_grok_build(config_path: Option<PathBuf>) -> anyhow
             bind,
             &gateway_config,
             &official_models,
+            &grok_client_version,
             true,
         )
         .map(|_| ())
@@ -65,12 +67,46 @@ fn grok_build_key_path() -> anyhow::Result<PathBuf> {
         .map_err(Into::into)
 }
 
+fn resolve_grok_build_version() -> anyhow::Result<String> {
+    let executable = std::env::var_os("GROK_CLI_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(if cfg!(windows) { "grok.exe" } else { "grok" }));
+    let output = std::process::Command::new(&executable)
+        .arg("--version")
+        .output()
+        .map_err(|error| anyhow::anyhow!("run {} --version: {error}", executable.display()))?;
+    anyhow::ensure!(
+        output.status.success(),
+        "{} --version exited with {}",
+        executable.display(),
+        output.status
+    );
+    let output = String::from_utf8(output.stdout)
+        .map_err(|error| anyhow::anyhow!("decode {} --version: {error}", executable.display()))?;
+    output
+        .split_whitespace()
+        .find(|field| {
+            field.split('.').count() >= 2
+                && field
+                    .split('.')
+                    .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+        })
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} --version returned no numeric version",
+                executable.display()
+            )
+        })
+}
+
 fn install_grok_build_with_models(
     config_path: &Path,
     key_path: &Path,
     bind: SocketAddr,
     gateway_config: &GatewayConfig,
     official_models: &[ProviderModel],
+    grok_client_version: &str,
     announce: bool,
 ) -> anyhow::Result<bool> {
     let models = collect_grok_build_models(gateway_config, official_models)?;
@@ -84,6 +120,7 @@ fn install_grok_build_with_models(
         key_path,
         bind,
         &models,
+        grok_client_version,
         &client_key,
     )?;
     if announce {
@@ -215,6 +252,7 @@ pub(in crate::cli) fn sync_installed_grok_build_models() -> anyhow::Result<bool>
         return Ok(false);
     }
     let bind = effective_gateway_bind(&gateway_config)?;
+    let grok_client_version = resolve_grok_build_version()?;
     anyhow::ensure!(
         bind.ip().is_loopback(),
         "Grok Build integration requires a loopback gateway"
@@ -225,6 +263,7 @@ pub(in crate::cli) fn sync_installed_grok_build_models() -> anyhow::Result<bool>
         bind,
         &gateway_config,
         &official_models,
+        &grok_client_version,
         false,
     )
 }
@@ -275,8 +314,16 @@ mod tests {
         let config_path = directory.path().join("config.toml");
         let key_path = directory.path().join("key");
         let config = gateway_config();
-        install_grok_build_with_models(&config_path, &key_path, config.bind, &config, &[], false)
-            .unwrap();
+        install_grok_build_with_models(
+            &config_path,
+            &key_path,
+            config.bind,
+            &config,
+            &[],
+            "1.0.46",
+            false,
+        )
+        .unwrap();
         let document = std::fs::read_to_string(config_path)
             .unwrap()
             .parse::<toml_edit::DocumentMut>()

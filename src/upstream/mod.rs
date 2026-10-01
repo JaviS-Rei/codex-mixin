@@ -67,6 +67,7 @@ impl UpstreamAccess {
         upstream_model_id: &str,
         hash_key: Option<&str>,
         native_headers: Option<&reqwest::header::HeaderMap>,
+        downstream_headers: &axum::http::HeaderMap,
         body: T,
     ) -> Result<reqwest::Response, GatewayError>
     where
@@ -81,6 +82,7 @@ impl UpstreamAccess {
         };
         let request = provider
             .apply_session_affinity(authenticated, hash_key)
+            .headers(forward_grok_client_headers(downstream_headers))
             .header(reqwest::header::ACCEPT, "text/event-stream");
         body::send_json(request, body).await
     }
@@ -101,6 +103,7 @@ impl UpstreamAccess {
         provider: &ProviderRuntime,
         request: &crate::anthropic::MessageRequest,
         hash_key: Option<&str>,
+        downstream_headers: &axum::http::HeaderMap,
     ) -> Result<AnthropicByteStream, GatewayError> {
         let beta = if request.speed.as_deref() == Some("fast") {
             Some(match provider.definition().anthropic_beta.as_deref() {
@@ -138,6 +141,7 @@ impl UpstreamAccess {
             upstream_request = provider.apply_anthropic_beta(upstream_request, beta.as_deref());
             let upstream_request = provider
                 .apply_session_affinity(upstream_request, hash_key)
+                .headers(forward_grok_client_headers(downstream_headers))
                 .header(header::ACCEPT, "text/event-stream");
             let response = if let Some(aws) = provider.aws_sigv4() {
                 let prepared = body::prepare_signed_json(request.clone()).await?;
@@ -202,6 +206,7 @@ impl UpstreamAccess {
         provider: &ProviderRuntime,
         mut request: crate::anthropic::MessageRequest,
         hash_key: Option<&str>,
+        downstream_headers: &axum::http::HeaderMap,
     ) -> Result<AnthropicByteStream, GatewayError> {
         let has_hosted_web_search = request.tools.iter().any(|tool| {
             tool.get("name").and_then(Value::as_str) == Some("web_search")
@@ -211,7 +216,7 @@ impl UpstreamAccess {
                     .is_some_and(|tool_type| tool_type.starts_with("web_search_"))
         });
         let upstream = self
-            .send_anthropic_request(provider, &request, hash_key)
+            .send_anthropic_request(provider, &request, hash_key, downstream_headers)
             .await?;
         if !has_hosted_web_search {
             return Ok(upstream);
@@ -235,6 +240,7 @@ impl UpstreamAccess {
                         provider,
                         &request,
                         retry_hash_key.as_deref().or(hash_key),
+                        downstream_headers,
                     )
                     .await?;
                 match inspect_anthropic_stream(retry).await? {
@@ -248,6 +254,52 @@ impl UpstreamAccess {
                 }
             }
         }
+    }
+}
+
+const GROK_CLIENT_HEADERS: &[&str] = &[
+    "x-grok-client-version",
+    "x-grok-client-identifier",
+    "x-grok-client-mode",
+    "x-grok-client-surface",
+    "user-agent",
+];
+
+fn forward_grok_client_headers(headers: &axum::http::HeaderMap) -> reqwest::header::HeaderMap {
+    let mut forwarded = reqwest::header::HeaderMap::new();
+    for &name in GROK_CLIENT_HEADERS {
+        if let Some(value) = headers.get(name) {
+            forwarded.insert(
+                reqwest::header::HeaderName::from_static(name),
+                value.clone(),
+            );
+        }
+    }
+    forwarded
+}
+
+#[cfg(test)]
+mod client_header_tests {
+    use super::*;
+
+    #[test]
+    fn forwards_grok_client_identity_headers_only() {
+        let mut inbound = axum::http::HeaderMap::new();
+        inbound.insert("x-grok-client-version", "1.0.46".parse().unwrap());
+        inbound.insert("x-grok-client-identifier", "grok-shell".parse().unwrap());
+        inbound.insert("x-grok-client-mode", "cli".parse().unwrap());
+        inbound.insert("x-grok-client-surface", "grok-build".parse().unwrap());
+        inbound.insert("user-agent", "grok/1.0.46".parse().unwrap());
+        inbound.insert("authorization", "Bearer secret".parse().unwrap());
+
+        let forwarded = forward_grok_client_headers(&inbound);
+
+        assert_eq!(forwarded["x-grok-client-version"], "1.0.46");
+        assert_eq!(forwarded["x-grok-client-identifier"], "grok-shell");
+        assert_eq!(forwarded["x-grok-client-mode"], "cli");
+        assert_eq!(forwarded["x-grok-client-surface"], "grok-build");
+        assert_eq!(forwarded[reqwest::header::USER_AGENT], "grok/1.0.46");
+        assert!(!forwarded.contains_key(reqwest::header::AUTHORIZATION));
     }
 }
 

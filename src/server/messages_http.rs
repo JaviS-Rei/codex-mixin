@@ -71,7 +71,7 @@ pub(super) async fn messages(
     let hash_key = routing.map(|routing| routing.hash_key);
     let first = state
         .upstream
-        .anthropic_stream_with_web_search_retry(provider, request, hash_key.as_deref())
+        .anthropic_stream_with_web_search_retry(provider, request, hash_key.as_deref(), &headers)
         .await;
     let upstream = match first {
         Ok(upstream) => upstream,
@@ -100,6 +100,7 @@ pub(super) async fn messages(
                     provider,
                     fallback_request,
                     hash_key.as_deref(),
+                    &headers,
                 )
                 .await?
         }

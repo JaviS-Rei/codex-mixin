@@ -89,6 +89,7 @@ pub(crate) async fn stream_provider_response(
                     provider,
                     converted.request,
                     routing.map(|routing| routing.hash_key.as_str()),
+                    headers,
                 )
                 .await?;
             let upstream = observe_upstream_cache_usage(upstream, observation);
@@ -124,6 +125,7 @@ pub(crate) async fn stream_provider_response(
                     &upstream_model_id,
                     routing.map(|routing| routing.hash_key.as_str()),
                     baidu_native.as_ref(),
+                    headers,
                     converted.request.clone(),
                 )
                 .await
@@ -172,6 +174,7 @@ pub(crate) async fn stream_provider_response(
                     &upstream_model_id,
                     routing.map(|routing| routing.hash_key.as_str()),
                     baidu_native.as_ref(),
+                    headers,
                     upstream_body.clone(),
                 )
                 .await;

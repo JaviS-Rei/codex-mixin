@@ -3,12 +3,16 @@ use std::net::SocketAddr;
 use std::path::Path;
 
 use anyhow::Context;
-use toml_edit::{Array, DocumentMut, Item, Table, Value, value};
+use toml_edit::{Array, DocumentMut, InlineTable, Item, Table, Value, value};
 
 use super::files::{set_owner_only, write_atomic_if_changed, write_owner_only};
 
 const PROVIDER_ID: &str = "codex-mixin-managed";
 const API_BACKEND: &str = "responses";
+const GROK_CLIENT_VERSION_HEADER: &str = "x-grok-client-version";
+const GROK_CLIENT_IDENTIFIER_HEADER: &str = "x-grok-client-identifier";
+const GROK_CLIENT_MODE_HEADER: &str = "x-grok-client-mode";
+const GROK_CLIENT_SURFACE_HEADER: &str = "x-grok-client-surface";
 const REASONING_EFFORTS: &[&str] = &["none", "minimal", "low", "medium", "high", "xhigh", "max"];
 const MANAGED_DESCRIPTION_PREFIX: &str = "[codex-mixin managed] ";
 
@@ -27,6 +31,7 @@ pub fn install(
     key_path: &Path,
     bind: SocketAddr,
     models: &[GrokBuildModel],
+    grok_client_version: &str,
     client_key: &str,
 ) -> anyhow::Result<bool> {
     anyhow::ensure!(
@@ -36,6 +41,10 @@ pub fn install(
     anyhow::ensure!(
         !client_key.trim().is_empty() && client_key == client_key.trim(),
         "Grok Build client key must be non-empty and contain no surrounding whitespace"
+    );
+    anyhow::ensure!(
+        valid_version(grok_client_version),
+        "Grok Build client version must be a dotted numeric version"
     );
     anyhow::ensure!(
         bind.ip().is_loopback(),
@@ -53,7 +62,7 @@ pub fn install(
     let key_changed = previous_key.as_deref() != Some(client_key.as_bytes());
 
     remove_managed_models(&mut document, &existing_managed_models)?;
-    upsert_provider(&mut document, key_path, bind)?;
+    upsert_provider(&mut document, key_path, bind, grok_client_version)?;
     upsert_models(&mut document, models)?;
 
     write_owner_only(key_path, client_key.as_bytes())?;
@@ -199,6 +208,7 @@ fn upsert_provider(
     document: &mut DocumentMut,
     key_path: &Path,
     bind: SocketAddr,
+    grok_client_version: &str,
 ) -> anyhow::Result<()> {
     match document.get("model_providers") {
         None => document["model_providers"] = Item::Table(Table::new()),
@@ -223,9 +233,23 @@ fn upsert_provider(
     let mut provider = Table::new();
     provider["base_url"] = value(format!("http://{bind}/v1"));
     provider["api_backend"] = value(API_BACKEND);
+    let mut extra_headers = InlineTable::new();
+    extra_headers.insert(GROK_CLIENT_VERSION_HEADER, Value::from(grok_client_version));
+    extra_headers.insert(GROK_CLIENT_IDENTIFIER_HEADER, Value::from("grok-shell"));
+    extra_headers.insert(GROK_CLIENT_MODE_HEADER, Value::from("cli"));
+    extra_headers.insert(GROK_CLIENT_SURFACE_HEADER, Value::from("grok-build"));
+    provider["extra_headers"] = Item::Value(Value::InlineTable(extra_headers));
     provider["auth"] = Item::Table(auth);
     providers.insert(PROVIDER_ID, Item::Table(provider));
     Ok(())
+}
+
+fn valid_version(version: &str) -> bool {
+    !version.is_empty()
+        && version.split('.').count() >= 2
+        && version
+            .split('.')
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 fn upsert_models(document: &mut DocumentMut, models: &[GrokBuildModel]) -> anyhow::Result<()> {
@@ -479,6 +503,7 @@ mod tests {
                 &key_path,
                 "127.0.0.1:8787".parse().unwrap(),
                 &[model("vision-custom")],
+                "1.0.46",
                 "client-secret",
             )
             .unwrap()
@@ -491,12 +516,23 @@ mod tests {
             Some("http://127.0.0.1:8787/v1")
         );
         assert_eq!(
+            installed["model_providers"][PROVIDER_ID]["extra_headers"][GROK_CLIENT_VERSION_HEADER]
+                .as_str(),
+            Some("1.0.46")
+        );
+        assert_eq!(
+            installed["model_providers"][PROVIDER_ID]["extra_headers"]
+                [GROK_CLIENT_IDENTIFIER_HEADER]
+                .as_str(),
+            Some("grok-shell")
+        );
+        assert_eq!(
             installed["model"]["vision-custom"]["model_provider"].as_str(),
             Some(PROVIDER_ID)
         );
         assert_eq!(
             installed["model"]["vision-custom"]["description"].as_str(),
-            Some("[codex-mixin managed] vision-custom · Test")
+            Some("[codex-mixin managed] Codex Mixin model")
         );
         assert_eq!(
             installed["model"]["vision-custom"]["reasoning_efforts"]
@@ -531,6 +567,7 @@ mod tests {
             &key_path,
             "127.0.0.1:8787".parse().unwrap(),
             &[model("custom")],
+            "1.0.46",
             "key",
         )
         .unwrap_err();
@@ -547,6 +584,7 @@ mod tests {
             &key_path,
             "127.0.0.1:8787".parse().unwrap(),
             &[model("custom")],
+            "1.0.46",
             "key",
         )
         .unwrap_err();
@@ -563,6 +601,7 @@ mod tests {
             &key_path,
             "127.0.0.1:8787".parse().unwrap(),
             &[model("fresh")],
+            "1.0.46",
             "key",
         )
         .unwrap_err();
@@ -580,6 +619,7 @@ mod tests {
             &key_path,
             "127.0.0.1:8787".parse().unwrap(),
             &[model("old")],
+            "1.0.46",
             "first-key",
         )
         .unwrap();
@@ -598,6 +638,7 @@ mod tests {
             &key_path,
             "127.0.0.1:9898".parse().unwrap(),
             &[model("new")],
+            "1.0.46",
             "second-key",
         )
         .unwrap();
@@ -616,6 +657,7 @@ mod tests {
                 &key_path,
                 "127.0.0.1:9898".parse().unwrap(),
                 &[model("new")],
+                "1.0.46",
                 "second-key",
             )
             .unwrap()
@@ -632,6 +674,7 @@ mod tests {
             &key_path,
             "127.0.0.1:8787".parse().unwrap(),
             &[model("managed")],
+            "1.0.46",
             "key",
         )
         .unwrap();
@@ -646,6 +689,7 @@ mod tests {
             &key_path,
             "127.0.0.1:8787".parse().unwrap(),
             &[model("managed")],
+            "1.0.46",
             "key",
         )
         .unwrap_err();
@@ -662,6 +706,7 @@ mod tests {
             &key_path,
             "0.0.0.0:8787".parse().unwrap(),
             &[model("managed")],
+            "1.0.46",
             "key",
         )
         .unwrap_err();
